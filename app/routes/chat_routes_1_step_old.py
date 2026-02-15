@@ -1,44 +1,29 @@
 from fastapi import APIRouter
 from app.schemas.chat_schema import ChatRequest, ChatResponse
 from app.services.llm_service import LLMService
-from app.services.rag_service import RAGService
 from app.services.memory_service import MemoryService
 
 router = APIRouter()
 
 llm_service = LLMService()
-rag_service = RAGService()
 memory_service = MemoryService()
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    # Retrieve relevant docs
-    retrieved_chunks = await rag_service.retrieve(request.message)
-    
-    # Build context block
-    context_text = "\n\n".join(retrieved_chunks)
-    
-    # Build final message list
+
+    # 1️⃣ Get previous history
     history = await memory_service.get_history(request.session_id)
-    
-    # Add current user message
+
+    # 2️⃣ Add current user message
     history.append({
         "role": "user",
-        "content": f"""
-            Answer the question using the context below.
-
-            Context:
-            {context_text}
-
-            Question:
-            {request.message}
-        """
+        "content": request.message
     })
 
-    # Generate response using full conversation
+    # 3️⃣ Generate response using full conversation
     reply = await llm_service.generate_response(history)
 
-    # Save assistant reply
+    # 4️⃣ Save assistant reply
     await memory_service.save_message(
         request.session_id,
         "assistant",
